@@ -45,10 +45,22 @@ private:
 			file.close();
 		}
 	};
+
+	struct TVShow {
+		string name;
+		int rate;
+		string channel;
+		string jenre;
+		bool operator<(const TVShow& tvShow) {
+			return rate < tvShow.rate;
+		}
+		
+	};
 	UserInterface* ui;
 
 	vector<User> users;
 public:
+
 	void encodeOrDecodePassword(string& pass)
 	{
 		char key = pass.size() % 10;
