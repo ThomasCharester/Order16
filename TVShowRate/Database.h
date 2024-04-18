@@ -50,6 +50,8 @@ private:
 			cout << "\nЛогин: " << login;
 			cout << "\tПрава администратора: " << isAdmin;
 		}
+
+		const string getLogin() { return login; }
 	};
 
 	struct TVShow {
@@ -57,6 +59,7 @@ private:
 		int rate;
 		string channel;
 		string jenre;
+		vector<string> usersRate;
 		bool operator<(const TVShow& tvShow) {
 			return rate < tvShow.rate;
 		}
@@ -67,13 +70,23 @@ private:
 			this->channel = channel;
 			this->jenre = jenre;
 		}
+		bool isUserRate(string login) const{
+			for (string str : usersRate)
+				if (str == login) return true;
+			return false;
+		}
 	};
 	UserInterface* ui;
 	vector<TVShow> tvShows;
 	vector<User> users;
 
+	User* currentUser;
+
 	void showUsers();
 public:
+	const string getUserLogin() const{
+		return currentUser->getLogin();
+	}
 	Database();
 	~Database();
 	void sortByName() {
@@ -99,7 +112,7 @@ public:
 			password[i] ^= key;
 	}
 
-	void showTVShows(bool showID = 0) {
+	void showTVShows(bool showID = false) {
 		for (int i = 0; i < tvShows.size(); i++) {
 			cout << '\n';
 			if (showID) cout << "\nНомер: " << i;
@@ -111,12 +124,13 @@ public:
 	}
 	void addTVShow();
 	void removeTVShow();
+	void editTVShow(int id);
 
 	void addUser();
 	void removeUser();
 	void addUsersToFile()
 	{
-		fstream file("users.txt", ios::in); ///////// Было ios::app, но теперь стирает содержимое, тк уже читаются все записи в базу программы
+		fstream file("users.txt", ios::out); ///////// Было ios::app, но теперь стирает содержимое, тк уже читаются все записи в базу программы
 		file << users.size() << '\n';
 		file.close();
 
@@ -164,25 +178,8 @@ public:
 		do
 		{
 			system("cls");
-			choice = 0;
 
-			cout << "Выберите действие:\n\t1 - просмотреть ТВ-шоу\n\t2 - поиск по фильтру\n\t3 - поставить оценку\n\t-1 - выход: ";
-
-			while ((choice < 1 || choice > 3) && choice != -1)
-			{
-				string temp;
-
-				getline(cin, temp);
-				if (!isInteger(temp))
-					cout << "Введите число: ";
-
-				else
-				{
-					choice = stoi(temp);
-					if ((choice < 1 || choice > 3) && choice != -1)
-						cout << "Введите число: ";
-				}
-			}
+			choice = inputRange(0, 3, "Выберите действие:\n\t1 - просмотреть ТВ-шоу\n\t2 - поиск по фильтру\n\t3 - поставить оценку\n\t0 - выход: ");
 
 			switch (choice)
 			{
@@ -200,7 +197,7 @@ public:
 				pressAnyButton();
 				break;
 			}
-		} while (choice != -1);
+		} while (choice != 0);
 	}
 	void adminMenu()
 	{
@@ -208,25 +205,8 @@ public:
 		do
 		{
 			system("cls");
-			choice = 0;
 
-			cout << "Выберите действие:\n\t1 - просмотреть ТВ-шоу\n\t2 - добавить ТВ-шоу\n\t3 - удалить ТВ-шоу\n\t4 - редактировать информацию ТВ-шоу\n\t5 - добавить пользователя\n\t6 - удалить пользователя\n\t7 - поиск по фильтру\n\t-1 - выход: ";
-
-			while ((choice < 1 || choice > 7) && choice != -1)
-			{
-				string temp;
-
-				getline(cin, temp);
-				if (!isInteger(temp))
-					cout << "Введите число: ";
-
-				else
-				{
-					choice = stoi(temp);
-					if ((choice < 1 || choice > 7) && choice != -1)
-						cout << "Введите число: ";
-				}
-			}
+			choice = inputRange(0, 7, "Выберите действие:\n\t1 - просмотреть ТВ-шоу\n\t2 - добавить ТВ-шоу\n\t3 - удалить ТВ-шоу\n\t4 - редактировать информацию ТВ-шоу\n\t5 - добавить пользователя\n\t6 - удалить пользователя\n\t7 - поиск по фильтру\n\t0 - выход: ");
 
 			switch (choice)
 			{
@@ -256,7 +236,7 @@ public:
 				pressAnyButton();
 				break;
 			}
-		} while (choice != -1);
+		} while (choice != 0);
 	}
 	void pressAnyButton()
 	{
@@ -290,7 +270,7 @@ public:
 
 			string buf;
 
-			cout << "Выберите действие:\t1 - войти в систему\tлюбое другое - выход: ";
+			cout << "Выберите действие:\t1 - войти в систему\tЛюбое другое - выход: ";
 			getline(cin, buf);
 
 			if (!isInteger(buf))
@@ -321,25 +301,8 @@ public:
 			do
 			{
 				system("cls");
-				choice = 0;
 
-				cout << "Выберите порядок:\n\t1 - по названию\n\t2 - по жанру\n\t3 - по рейтингу\n\t4 - по каналу\n\t-1 - выход: ";
-
-				while ((choice < 1 || choice > 3) && choice != -1)
-				{
-					string temp;
-
-					getline(cin, temp);
-					if (!isInteger(temp))
-						cout << "Введите число: ";
-
-					else
-					{
-						choice = stoi(temp);
-						if ((choice < 1 || choice > 3) && choice != -1)
-							cout << "Введите число: ";
-					}
-				}
+				choice = inputRange(0, 4, "Выберите порядок:\n\t1 - по названию\n\t2 - по жанру\n\t3 - по рейтингу\n\t4 - по каналу\n\t0 - выход: ");
 
 				switch (choice)
 				{
@@ -360,9 +323,9 @@ public:
 				}
 				db->showTVShows();
 				pressAnyButton();
-			} while (choice != -1);
+			} while (choice != 0);
 
-		} while (choice != -1);
+		} while (choice != 0);
 	}
 	void filterTVShows() {
 		int choice;
@@ -370,25 +333,8 @@ public:
 			do
 			{
 				system("cls");
-				choice = 0;
 
-				cout << "Выберите фильтр:\n\t1 - по каналу\n\t2 - по жанру\n\t-1 - выход: ";
-
-				while ((choice < 1 || choice > 3) && choice != -1)
-				{
-					string temp;
-
-					getline(cin, temp);
-					if (!isInteger(temp))
-						cout << "Введите число: ";
-
-					else
-					{
-						choice = stoi(temp);
-						if ((choice < 1 || choice > 3) && choice != -1)
-							cout << "Введите число: ";
-					}
-				}
+				choice = inputRange(0, 2, "Выберите фильтр:\n\t1 - по каналу\n\t2 - по жанру\n\t0 - выход: ");
 
 				switch (choice)
 				{
@@ -402,13 +348,41 @@ public:
 					break;
 				}
 				pressAnyButton();
-			} while (choice != -1);
+			} while (choice != 0);
 
-		} while (choice != -1);
+		} while (choice != 0);
+	}
+	void editTVShow() {
+		system("cls");
+		db->showTVShows(true);
+		int choice;
+		inputInt(choice, "\nВведите номер шоу, чтобы редактировать: ");
+		db->editTVShow(choice);
+	}
+	int inputRange(int min, int max, string text = "") {
+		int choice = min - 1;
+		cout << text;
+		do
+		{
+			string temp;
+
+			getline(cin, temp);
+			if (!isInteger(temp))
+				cout << "Введите число: ";
+			else
+			{
+				choice = stoi(temp);
+				if ((choice < min || choice > max))
+					cout << "Введите число от " << min << " до " << max;
+			}
+		} while ((choice < min || choice > max));
+
+		return choice;
 	}
 };
 Database::Database() {
 	ui = new UserInterface(this);
+	currentUser = nullptr;
 	ui->startUI();
 }
 Database::~Database()
@@ -419,7 +393,15 @@ Database::~Database()
 
 void Database::setRate()
 {
+	system("cls");
+	showTVShows(true);
 
+	
+	int choice = ui->inputRange(0,tvShows.size(), "\nВведите номер шоу, чтобы оценить: ");
+
+	if (!tvShows.at(choice).isUserRate(getUserLogin())) {
+		
+	}
 }
 
 void Database::filterByJenre()
@@ -503,6 +485,8 @@ void Database::login()
 			cout << "Неправильный пароль!\n";
 	} while (!isPasswordRight);
 
+	currentUser = &(users.at(i));
+
 	cout << "Вы успешно вошли в аккаунт!\n";
 	ui->pressAnyButton();
 
@@ -513,17 +497,17 @@ void Database::login()
 }
 void Database::addTVShow() {
 	system("cls");
+
 	cout << "\n\nВведите название: ";
 	string name;
 	getline(cin, name);
-	int rate;
-	while (true) {
-		ui->inputInt(rate, "\nВведите рейтинг (от 0 до 100): ");
-		if (rate >= 0 && rate <= 100) break;
-	}
+
+	int rate = ui->inputRange(0, 100, "Введите число от 0, до 100");
+
 	string channel;
 	cout << "\nВведите название канала: ";
 	getline(cin, channel);
+
 	string jenre;
 	cout << "\nВведите жанр: ";
 	getline(cin, jenre);
@@ -533,15 +517,63 @@ void Database::addTVShow() {
 void Database::removeTVShow() {
 	system("cls");
 	showTVShows(true);
+
 	int choice;
 	ui->inputInt(choice, "\nВведите номер шоу, чтобы удалить: ");
-	int confirm;
-	while (true) {
-		ui->inputInt(confirm, "\nВы уверены? 1 - Да/0 - Нет");
-		if (confirm == 1) break;
-		else if (confirm == 0) return;
-	}
+
+	int confirm = ui->inputRange(0, 1, "\nВы уверены? 1 - Да/0 - Нет");
+	if (!confirm) return;
+
 	tvShows.erase(tvShows.begin() + choice);
+}
+void Database::editTVShow(int id)
+{
+	int choice;
+	do {
+		do
+		{
+			system("cls");
+
+			choice = ui->inputRange(0, 4, "Выберите параметр:\n\t1 - название\n\t2 - жанр\n\t3 - канал\n\t4 - рейтинг\n\t0 - выход: ");
+
+			switch (choice)
+			{
+			case 1:
+			{
+				string name;
+				cout << "\nВведите название: ";
+				getline(cin, name);
+				tvShows.at(id).name = name;
+			}
+			break;
+			case 2:
+			{
+				string jenre;
+				cout << "\nВведите жанр: ";
+				getline(cin, jenre);
+				tvShows.at(id).jenre = jenre;
+			}
+			break;
+			case 3:
+			{
+				string channel;
+				cout << "\nВведите жанр: ";
+				getline(cin, channel);
+				tvShows.at(id).channel = channel;
+			}
+			break;
+			case 4:
+			{
+				int rate = ui->inputRange(0, 100, "\nВведите рейтинг (от 0 до 100): ");
+				tvShows.at(id).rate = rate;
+			}
+			break;
+			default:
+				break;
+			}
+		} while (choice != 0);
+
+	} while (choice != 0);
 }
 void Database::showUsers()
 {
@@ -560,11 +592,7 @@ void Database::addUser()
 	string password;
 	cout << "\nВведите пароль: ";
 	getline(cin, password);
-	int admin;
-	while (true) {
-		ui->inputInt(admin, "\nЭто администратор? 1 - Да/0 - Нет");
-		if (admin >= 0 && admin <= 1) break;
-	}
+	int admin = ui->inputRange(0, 1, "\nВы уверены? 1 - Да/0 - Нет");
 
 	users.push_back(User(login, password, admin));
 	addUsersToFile();
@@ -576,11 +604,9 @@ void Database::removeUser()
 	showUsers();
 	int choice;
 	ui->inputInt(choice, "\nВведите номер учётной записи, чтобы удалить: ");
-	int confirm;
-	while (true) {
-		ui->inputInt(confirm, "\nВы уверены? 1 - Да/0 - Нет");
-		if (confirm == 1) break;
-		else if (confirm == 0) return;
-	}
+
+	int confirm = ui->inputRange(0, 1, "\nВы уверены? 1 - Да/0 - Нет");
+	if (!confirm) return;
+
 	users.erase(users.begin() + choice);
 }
