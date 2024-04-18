@@ -60,6 +60,7 @@ private:
 		string channel;
 		string jenre;
 		vector<string> usersRate;
+		vector<int> ratings;
 		bool operator<(const TVShow& tvShow) {
 			return rate < tvShow.rate;
 		}
@@ -70,10 +71,26 @@ private:
 			this->channel = channel;
 			this->jenre = jenre;
 		}
-		bool isUserRate(string login) const{
-			for (string str : usersRate)
-				if (str == login) return true;
-			return false;
+		int isUserRate(string login) const {
+			for (int i = 0; i < usersRate.size(); i++)
+				if (usersRate.at(i) == login) return i;
+			return -1;
+		}
+		void balanceRate() {
+			if (!ratings.size()) return;
+			rate = 0;
+			for (int r : ratings)
+				rate += r;
+			rate /= (int)ratings.size();
+		}
+		void addToFile()
+		{
+			fstream file("tvShows.txt", ios::app);
+			file << 'S' << ' ' << name << ' ' << rate << ' ' << channel << ' ' << jenre << '\n';
+			for (int i = 0; i < usersRate.size(); i++) {
+				file << usersRate.at(i) << ' ' << ratings.at(i) << '\n';
+			}
+			file.close();
 		}
 	};
 	UserInterface* ui;
@@ -84,7 +101,7 @@ private:
 
 	void showUsers();
 public:
-	const string getUserLogin() const{
+	const string getUserLogin() const {
 		return currentUser->getLogin();
 	}
 	Database();
@@ -121,6 +138,7 @@ public:
 			cout << "\nЖанр: " << tvShows.at(i).jenre;
 			cout << "\nРейтинг: " << tvShows.at(i).rate;
 		}
+		cout << '\n';
 	}
 	void addTVShow();
 	void removeTVShow();
@@ -128,7 +146,52 @@ public:
 
 	void addUser();
 	void removeUser();
-	void addUsersToFile()
+
+	void writeTVShowsToFile() {
+		fstream file("tvShows.txt", ios::out);
+		file << tvShows.size() << '\n';
+		file.close();
+
+		for (int i = 0; i < tvShows.size(); i++)
+			tvShows[i].addToFile();
+	}
+	void readTVShowsFromFile()
+	{
+		tvShows.clear();
+
+		fstream file("tvShows.txt", ios::in);
+
+		if (file.eof()) return;
+
+		string temp;
+
+		getline(file, temp, '\n');
+		int size = stoi(temp);
+
+		getline(file, temp, ' ');
+		for (int i = 0; i < size; i++)
+		{
+			string name, rate, channel, jenre;
+			
+			getline(file, name, ' ');
+			getline(file, rate, ' ');
+			getline(file, channel, ' ');
+			getline(file, jenre, '\n');
+
+			tvShows.emplace_back(TVShow(name,stoi(rate),channel,jenre));
+			do {
+				if (file.eof()) break;
+				getline(file, temp, ' ');
+				if (temp == "S" || file.eof())break;
+				tvShows.at(tvShows.size() - 1).usersRate.emplace_back(temp);
+				getline(file, temp, '\n');
+				tvShows.at(tvShows.size() - 1).ratings.emplace_back(stoi(temp));
+			} while (true);
+			tvShows.at(tvShows.size() - 1).balanceRate();
+		}
+	}
+
+	void writeUsersToFile()
 	{
 		fstream file("users.txt", ios::out); ///////// Было ios::app, но теперь стирает содержимое, тк уже читаются все записи в базу программы
 		file << users.size() << '\n';
@@ -141,6 +204,12 @@ public:
 	{
 		users.clear();
 		fstream file("users.txt", ios::in);
+
+		if (file.eof()) 
+		{
+			cout << "\nУчётных записей нет, создайте новую";
+			addUser();
+		}
 
 		string temp;
 
@@ -190,8 +259,7 @@ public:
 				filterTVShows();
 				break;
 			case 3:
-				cout << "Пока нет\n";
-				pressAnyButton();
+				db->setRate();
 				break;
 			default:
 				pressAnyButton();
@@ -220,8 +288,7 @@ public:
 				db->removeTVShow();
 				break;
 			case 4:
-				cout << "Пока нет\n";
-				pressAnyButton();
+				editTVShow();
 				break;
 			case 5:
 				db->addUser();
@@ -321,7 +388,7 @@ public:
 				default:
 					break;
 				}
-				db->showTVShows();
+				if(choice) db->showTVShows();
 				pressAnyButton();
 			} while (choice != 0);
 
@@ -383,24 +450,32 @@ public:
 Database::Database() {
 	ui = new UserInterface(this);
 	currentUser = nullptr;
+	readTVShowsFromFile();
 	ui->startUI();
 }
 Database::~Database()
 {
-	addUsersToFile();
+	writeTVShowsToFile();
+	writeUsersToFile();
 	delete ui;
 }
 
 void Database::setRate()
 {
 	system("cls");
+	if (tvShows.empty()) return;
 	showTVShows(true);
 
-	
-	int choice = ui->inputRange(0,tvShows.size(), "\nВведите номер шоу, чтобы оценить: ");
-
-	if (!tvShows.at(choice).isUserRate(getUserLogin())) {
-		
+	int choice = ui->inputRange(0, (int)tvShows.size(), "\nВведите номер шоу, чтобы оценить: ");
+	int userRateId = tvShows.at(choice).isUserRate(getUserLogin());
+	if (userRateId < 0) {
+		tvShows.at(choice).usersRate.push_back(getUserLogin());
+		tvShows.at(choice).ratings.push_back(ui->inputRange(0, 100, "\nВведите оценку от 0, до 100: "));
+		tvShows.at(choice).balanceRate();
+	}
+	else {
+		tvShows.at(choice).ratings.at(userRateId) = ui->inputRange(0, 100, "\nВведите оценку от 0, до 100: ");
+		tvShows.at(choice).balanceRate();
 	}
 }
 
@@ -595,7 +670,7 @@ void Database::addUser()
 	int admin = ui->inputRange(0, 1, "\nВы уверены? 1 - Да/0 - Нет");
 
 	users.push_back(User(login, password, admin));
-	addUsersToFile();
+	writeUsersToFile();
 }
 
 void Database::removeUser()
