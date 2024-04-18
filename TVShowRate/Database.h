@@ -50,49 +50,45 @@ private:
 			cout << "\nЛогин: " << login;
 			cout << "\tПрава администратора: " << isAdmin;
 		}
-
-		const string getLogin() { return login; }
 	};
 
 	struct TVShow {
 		string name;
+
 		int rate;
-		string channel;
-		string jenre;
-		vector<string> usersRate;
-		vector<int> ratings;
+		int spectators;
+		double averageWatchTime;
+
+		static int maxSpectators;
+		static double maxAverageWatchTime;
+
 		bool operator<(const TVShow& tvShow) {
 			return rate < tvShow.rate;
 		}
 		TVShow() = default;
-		TVShow(string name, int rate, string channel, string jenre) {
+		TVShow(string name, int spectators, double averageWatchTime, int rate = 0) {
 			this->name = name;
+			this->spectators = spectators;
+			this->averageWatchTime = averageWatchTime;
 			this->rate = rate;
-			this->channel = channel;
-			this->jenre = jenre;
-		}
-		int isUserRate(string login) const {
-			for (int i = 0; i < usersRate.size(); i++)
-				if (usersRate.at(i) == login) return i;
-			return -1;
+			balanceMaxes();
 		}
 		void balanceRate() {
-			if (!ratings.size()) return;
-			rate = 0;
-			for (int r : ratings)
-				rate += r;
-			rate /= (int)ratings.size();
+			rate = (int)((averageWatchTime * spectators) * 100 / (maxSpectators * maxAverageWatchTime));
 		}
-		void addToFile()
+		void balanceMaxes() const{
+			if (spectators > maxSpectators) maxSpectators = spectators;
+			if (averageWatchTime > maxAverageWatchTime) maxAverageWatchTime = averageWatchTime;
+		}
+		void addToFile() const
 		{
 			fstream file("tvShows.txt", ios::app);
-			file << 'S' << ' ' << name << ' ' << rate << ' ' << channel << ' ' << jenre << '\n';
-			for (int i = 0; i < usersRate.size(); i++) {
-				file << usersRate.at(i) << ' ' << ratings.at(i) << '\n';
-			}
+			file << name << ' ' << spectators << ' ' << averageWatchTime << ' ' << rate << '\n';
+
 			file.close();
 		}
 	};
+
 	UserInterface* ui;
 	vector<TVShow> tvShows;
 	vector<User> users;
@@ -101,26 +97,17 @@ private:
 
 	void showUsers();
 public:
-	const string getUserLogin() const {
-		return currentUser->getLogin();
-	}
+
 	Database();
 	~Database();
+
 	void sortByName() {
 		sort(tvShows.begin(), tvShows.end(), [](const TVShow& tv1, const TVShow& tv2) {return tv1.name[0] < tv2.name[0]; });
 	}
 	void sortByRate() {
 		sort(tvShows.begin(), tvShows.end());
 	}
-	void sortByChannel() {
-		sort(tvShows.begin(), tvShows.end(), [](const TVShow& tv1, const TVShow& tv2) {return tv1.channel[0] < tv2.channel[0]; });
-	}
-	void sortByJenre() {
-		sort(tvShows.begin(), tvShows.end(), [](const TVShow& tv1, const TVShow& tv2) {return tv1.jenre[0] < tv2.jenre[0]; });
-	}
-	void setRate();
-	void filterByJenre();
-	void filterByChannel();
+
 	void encodeOrDecodePassword(string& password)
 	{
 		char key = password.size() % 10;
@@ -134,15 +121,28 @@ public:
 			cout << '\n';
 			if (showID) cout << "\nНомер: " << i;
 			cout << "\nНазвание: " << tvShows.at(i).name;
-			cout << "\nКанал: " << tvShows.at(i).channel;
-			cout << "\nЖанр: " << tvShows.at(i).jenre;
 			cout << "\nРейтинг: " << tvShows.at(i).rate;
+			cout << "\nКоличество зрителей: " << tvShows.at(i).spectators;
+			cout << "\nСреднее количество просмотров: " << tvShows.at(i).averageWatchTime;
 		}
 		cout << '\n';
 	}
 	void addTVShow();
 	void removeTVShow();
 	void editTVShow(int id);
+	void rebalanceAllMaxes() {
+		TVShow::maxAverageWatchTime = 0;
+		TVShow::maxSpectators = 0;
+		for (TVShow tv : tvShows) {
+			tv.balanceMaxes();
+		}
+		rebalanceAllRate();
+	}
+	void rebalanceAllRate() {
+		for (TVShow tv : tvShows) {
+			tv.balanceRate();
+		}
+	}
 
 	void addUser();
 	void removeUser();
@@ -168,25 +168,17 @@ public:
 		getline(file, temp, '\n');
 		int size = stoi(temp);
 
-		getline(file, temp, ' ');
 		for (int i = 0; i < size; i++)
 		{
-			string name, rate, channel, jenre;
-			
-			getline(file, name, ' ');
-			getline(file, rate, ' ');
-			getline(file, channel, ' ');
-			getline(file, jenre, '\n');
+			string name, rate, spectators, averageWatchTime;
 
-			tvShows.emplace_back(TVShow(name,stoi(rate),channel,jenre));
-			do {
-				if (file.eof()) break;
-				getline(file, temp, ' ');
-				if (temp == "S" || file.eof())break;
-				tvShows.at(tvShows.size() - 1).usersRate.emplace_back(temp);
-				getline(file, temp, '\n');
-				tvShows.at(tvShows.size() - 1).ratings.emplace_back(stoi(temp));
-			} while (true);
+			getline(file, name, ' ');
+			getline(file, spectators, ' ');
+			getline(file, averageWatchTime, ' ');
+			getline(file, rate, '\n');
+
+			tvShows.emplace_back(TVShow(name, stoi(spectators), stod(averageWatchTime), stoi(rate)));
+
 			tvShows.at(tvShows.size() - 1).balanceRate();
 		}
 	}
@@ -205,7 +197,7 @@ public:
 		users.clear();
 		fstream file("users.txt", ios::in);
 
-		if (file.eof()) 
+		if (file.eof())
 		{
 			cout << "\nУчётных записей нет, создайте новую";
 			addUser();
@@ -248,18 +240,12 @@ public:
 		{
 			system("cls");
 
-			choice = inputRange(0, 3, "Выберите действие:\n\t1 - просмотреть ТВ-шоу\n\t2 - поиск по фильтру\n\t3 - поставить оценку\n\t0 - выход: ");
+			choice = inputRange(0, 1, "Выберите действие:\n\t1 - просмотреть ТВ-шоу\n\t0 - выход: ");
 
 			switch (choice)
 			{
 			case 1:
 				showTVShows();
-				break;
-			case 2:
-				filterTVShows();
-				break;
-			case 3:
-				db->setRate();
 				break;
 			default:
 				pressAnyButton();
@@ -274,7 +260,7 @@ public:
 		{
 			system("cls");
 
-			choice = inputRange(0, 7, "Выберите действие:\n\t1 - просмотреть ТВ-шоу\n\t2 - добавить ТВ-шоу\n\t3 - удалить ТВ-шоу\n\t4 - редактировать информацию ТВ-шоу\n\t5 - добавить пользователя\n\t6 - удалить пользователя\n\t7 - поиск по фильтру\n\t0 - выход: ");
+			choice = inputRange(0, 7, "Выберите действие:\n\t1 - просмотреть ТВ-шоу\n\t2 - добавить ТВ-шоу\n\t3 - удалить ТВ-шоу\n\t4 - редактировать информацию ТВ-шоу\n\t5 - добавить пользователя\n\t6 - удалить пользователя\n\t0 - выход: ");
 
 			switch (choice)
 			{
@@ -296,9 +282,6 @@ public:
 			case 6:
 				db->removeUser();
 				break;
-			case 7:
-				filterTVShows();
-				break;
 			default:
 				pressAnyButton();
 				break;
@@ -310,11 +293,25 @@ public:
 		system("pause");
 		system("cls");
 	}
+
 	bool isInteger(string input)
 	{
 		try
 		{
 			int temp = stoi(input);
+		}
+		catch (invalid_argument)
+		{
+			return false;
+		}
+
+		return true;
+	}
+	bool isDouble(string input)
+	{
+		try
+		{
+			double temp = stod(input);
 		}
 		catch (invalid_argument)
 		{
@@ -351,6 +348,7 @@ public:
 
 		cout << "Хорошего дня!";
 	}
+
 	void inputInt(int& data, string text) {
 		string temp;
 		cout << text;
@@ -362,6 +360,7 @@ public:
 			}
 		}
 	}
+
 	void showTVShows() {
 		int choice;
 		do {
@@ -369,7 +368,7 @@ public:
 			{
 				system("cls");
 
-				choice = inputRange(0, 4, "Выберите порядок:\n\t1 - по названию\n\t2 - по жанру\n\t3 - по рейтингу\n\t4 - по каналу\n\t0 - выход: ");
+				choice = inputRange(0, 2, "Выберите порядок:\n\t1 - по названию\n\t2 - по рейтингу\n\t0 - выход: ");
 
 				switch (choice)
 				{
@@ -377,43 +376,12 @@ public:
 					db->sortByName();
 					break;
 				case 2:
-					db->sortByJenre();
-					break;
-				case 3:
 					db->sortByRate();
 					break;
-				case 4:
-					db->sortByChannel();
-					break;
 				default:
 					break;
 				}
-				if(choice) db->showTVShows();
-				pressAnyButton();
-			} while (choice != 0);
-
-		} while (choice != 0);
-	}
-	void filterTVShows() {
-		int choice;
-		do {
-			do
-			{
-				system("cls");
-
-				choice = inputRange(0, 2, "Выберите фильтр:\n\t1 - по каналу\n\t2 - по жанру\n\t0 - выход: ");
-
-				switch (choice)
-				{
-				case 1:
-					db->filterByChannel();
-					break;
-				case 2:
-					db->filterByJenre();
-					break;
-				default:
-					break;
-				}
+				if (choice) db->showTVShows();
 				pressAnyButton();
 			} while (choice != 0);
 
@@ -426,6 +394,7 @@ public:
 		inputInt(choice, "\nВведите номер шоу, чтобы редактировать: ");
 		db->editTVShow(choice);
 	}
+
 	int inputRange(int min, int max, string text = "") {
 		int choice = min - 1;
 		cout << text;
@@ -439,10 +408,30 @@ public:
 			else
 			{
 				choice = stoi(temp);
-				if ((choice < min || choice > max))
-					cout << "Введите число от " << min << " до " << max;
+				if ((choice < min || (choice > max && max != min)))
+					cout << "Введите число от " << min << " до " << (max != min) ? to_string(max) : "infinite";
 			}
-		} while ((choice < min || choice > max));
+		} while ((choice < min || (choice > max && max != min)));
+
+		return choice;
+	}
+	double inputRange(double min, double max, string text = "") {
+		double choice = min - 1.0;
+		cout << text;
+		do
+		{
+			string temp;
+
+			getline(cin, temp);
+			if (!isDouble(temp))
+				cout << "Введите число: ";
+			else
+			{
+				choice = stod(temp);
+				if ((choice < min || (choice > max && max != min)))
+					cout << "Введите число от " << min << " до " << (max != min) ? to_string(max) : "infinite";
+			}
+		} while ((choice < min || (choice > max && max != min)));
 
 		return choice;
 	}
@@ -460,64 +449,6 @@ Database::~Database()
 	delete ui;
 }
 
-void Database::setRate()
-{
-	system("cls");
-	if (tvShows.empty()) return;
-	showTVShows(true);
-
-	int choice = ui->inputRange(0, (int)tvShows.size(), "\nВведите номер шоу, чтобы оценить: ");
-	int userRateId = tvShows.at(choice).isUserRate(getUserLogin());
-	if (userRateId < 0) {
-		tvShows.at(choice).usersRate.push_back(getUserLogin());
-		tvShows.at(choice).ratings.push_back(ui->inputRange(0, 100, "\nВведите оценку от 0, до 100: "));
-		tvShows.at(choice).balanceRate();
-	}
-	else {
-		tvShows.at(choice).ratings.at(userRateId) = ui->inputRange(0, 100, "\nВведите оценку от 0, до 100: ");
-		tvShows.at(choice).balanceRate();
-	}
-}
-
-void Database::filterByJenre()
-{
-	system("cls");
-	cout << "\n\nВведите жанр: ";
-	string jenre;
-	getline(cin, jenre);
-	bool jenreExist = false;
-	for (int i = 0; i < tvShows.size(); i++) {
-		if (tvShows.at(i).jenre == jenre) {
-			cout << '\n';
-			cout << "\nНазвание: " << tvShows.at(i).name;
-			cout << "\nКанал: " << tvShows.at(i).channel;
-			cout << "\nЖанр: " << tvShows.at(i).jenre;
-			cout << "\nРейтинг: " << tvShows.at(i).rate;
-			jenreExist = true;
-		}
-	}
-	if (!jenreExist) cout << "\nПо запросу ничего не нашлось\n";
-}
-
-void Database::filterByChannel()
-{
-	system("cls");
-	cout << "\n\nВведите канал: ";
-	string channel;
-	getline(cin, channel);
-	bool channelExist = false;
-	for (int i = 0; i < tvShows.size(); i++) {
-		if (tvShows.at(i).channel == channel) {
-			cout << '\n';
-			cout << "\nНазвание: " << tvShows.at(i).name;
-			cout << "\nКанал: " << tvShows.at(i).channel;
-			cout << "\nЖанр: " << tvShows.at(i).jenre;
-			cout << "\nРейтинг: " << tvShows.at(i).rate;
-			channelExist = true;
-		}
-	}
-	if (!channelExist) cout << "\nПо запросу ничего не нашлось\n";
-}
 
 void Database::login()
 {
@@ -570,6 +501,7 @@ void Database::login()
 	else
 		ui->userMenu();
 }
+
 void Database::addTVShow() {
 	system("cls");
 
@@ -577,17 +509,11 @@ void Database::addTVShow() {
 	string name;
 	getline(cin, name);
 
-	int rate = ui->inputRange(0, 100, "Введите число от 0, до 100");
+	int spectators = ui->inputRange(0, 0, "Введите число зрителей");
 
-	string channel;
-	cout << "\nВведите название канала: ";
-	getline(cin, channel);
+	double averageWatchTime = ui->inputRange(0.0, 0.0, "Введите число зрителей");
 
-	string jenre;
-	cout << "\nВведите жанр: ";
-	getline(cin, jenre);
-
-	tvShows.push_back(TVShow(name, rate, channel, jenre));
+	tvShows.push_back(TVShow(name, spectators, averageWatchTime));
 }
 void Database::removeTVShow() {
 	system("cls");
@@ -600,56 +526,46 @@ void Database::removeTVShow() {
 	if (!confirm) return;
 
 	tvShows.erase(tvShows.begin() + choice);
+	rebalanceAllMaxes();
 }
 void Database::editTVShow(int id)
 {
 	int choice;
-	do {
-		do
+	do
+	{
+		system("cls");
+
+		choice = ui->inputRange(0, 2, "Выберите параметр:\n\t1 - название\n\t2 - количество зрителей\n\t3 - среднее время просмотра\n\t0 - выход: ");
+
+		switch (choice)
 		{
-			system("cls");
-
-			choice = ui->inputRange(0, 4, "Выберите параметр:\n\t1 - название\n\t2 - жанр\n\t3 - канал\n\t4 - рейтинг\n\t0 - выход: ");
-
-			switch (choice)
-			{
-			case 1:
-			{
-				string name;
-				cout << "\nВведите название: ";
-				getline(cin, name);
-				tvShows.at(id).name = name;
-			}
+		case 1:
+		{
+			string name;
+			cout << "\nВведите название: ";
+			getline(cin, name);
+			tvShows.at(id).name = name;
+		}
+		break;
+		case 2:
+		{
+			int spectators = ui->inputRange(0, 0, "Введите число зрителей");
+			tvShows.at(id).spectators = spectators;
+		}
+		break;
+		case 3:
+		{
+			double averageWatchTime = ui->inputRange(0.0, 0.0, "Введите число зрителей");
+			tvShows.at(id).averageWatchTime = averageWatchTime;
+		}
+		break;
+		default:
 			break;
-			case 2:
-			{
-				string jenre;
-				cout << "\nВведите жанр: ";
-				getline(cin, jenre);
-				tvShows.at(id).jenre = jenre;
-			}
-			break;
-			case 3:
-			{
-				string channel;
-				cout << "\nВведите жанр: ";
-				getline(cin, channel);
-				tvShows.at(id).channel = channel;
-			}
-			break;
-			case 4:
-			{
-				int rate = ui->inputRange(0, 100, "\nВведите рейтинг (от 0 до 100): ");
-				tvShows.at(id).rate = rate;
-			}
-			break;
-			default:
-				break;
-			}
-		} while (choice != 0);
-
+		}
 	} while (choice != 0);
+	rebalanceAllMaxes();
 }
+
 void Database::showUsers()
 {
 	for (int i = 0; i < users.size(); i++) {
@@ -672,7 +588,6 @@ void Database::addUser()
 	users.push_back(User(login, password, admin));
 	writeUsersToFile();
 }
-
 void Database::removeUser()
 {
 	system("cls");
@@ -685,3 +600,6 @@ void Database::removeUser()
 
 	users.erase(users.begin() + choice);
 }
+
+int Database::TVShow::maxSpectators = 0;
+double Database::TVShow::maxAverageWatchTime = 0;
