@@ -131,6 +131,7 @@ public:
 	void removeTVShow();
 	void editTVShow(int id);
 	void rebalanceAllMaxes() {
+		if (tvShows.empty()) return;
 		TVShow::maxAverageWatchTime = 0;
 		TVShow::maxSpectators = 0;
 		for (TVShow tv : tvShows) {
@@ -139,6 +140,7 @@ public:
 		rebalanceAllRate();
 	}
 	void rebalanceAllRate() {
+		if (tvShows.empty()) return;
 		for (TVShow tv : tvShows) {
 			tv.balanceRate();
 		}
@@ -161,7 +163,9 @@ public:
 
 		fstream file("tvShows.txt", ios::in);
 
-		if (file.eof()) return;
+		if (file.eof()) {
+			file.close();
+			return; }
 
 		string temp;
 
@@ -181,6 +185,7 @@ public:
 
 			tvShows.at(tvShows.size() - 1).balanceRate();
 		}
+		file.close();
 	}
 
 	void writeUsersToFile()
@@ -220,6 +225,7 @@ public:
 
 			users.emplace_back(login, password, isAdmin);
 		}
+		file.close();
 	}
 
 	void login();

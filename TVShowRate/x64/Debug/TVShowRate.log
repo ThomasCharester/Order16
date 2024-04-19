@@ -1,2 +1,8 @@
 ﻿  main.cpp
+F:\Order16\TVShowRate\Database.h(418,85): warning C4834: удаление возвращаемого значения функции с атрибутом [[nodiscard]]
+  (компиляция исходного файла "main.cpp")
+  
+F:\Order16\TVShowRate\Database.h(438,85): warning C4834: удаление возвращаемого значения функции с атрибутом [[nodiscard]]
+  (компиляция исходного файла "main.cpp")
+  
   TVShowRate.vcxproj -> F:\Order16\TVShowRate\x64\Debug\TVShowRate.exe
